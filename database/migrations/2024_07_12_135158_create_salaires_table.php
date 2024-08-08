@@ -12,11 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('salaires', function (Blueprint $table) {
-            $table->id();
-            // $table->month('mois'); 
+            $table->id(); 
             $table->string('mois', 7);
             $table->integer('nombre_jour');
-            $table->decimal('heures_supplementaires', 5, 2)->default(0);
+            $table->json('date_sup');
             $table->foreignId('salarier_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });

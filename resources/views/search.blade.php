@@ -64,6 +64,11 @@
     </style>
 </head>
 <body>
+    @if(session('error'))
+        <div class="alert alert-danger">
+            {{ session('error') }}
+        </div>
+    @endif
     <div class="payslip">
         <form action="{{route('bulletin.search')}}" method="POST">
             @csrf

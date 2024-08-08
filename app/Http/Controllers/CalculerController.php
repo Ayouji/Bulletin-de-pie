@@ -3,12 +3,16 @@ namespace App\Http\Controllers;
 
 use App\Models\BaremeIR;
 use App\Models\Bulletin;
+use App\Models\Heure_sup;
 use App\Models\Prime;
 use App\Models\Salaire;
 use Illuminate\Http\Request;
 use App\Models\Salarier;
 use App\Models\Tcotis;
+use Carbon\Carbon;
 use Carbon\Month;
+use Exception;
+use Illuminate\Support\Facades\Log;
 
 class CalculerController extends Controller
 {
@@ -17,98 +21,118 @@ class CalculerController extends Controller
         return view('salarier', compact('salarier'));
     }
     public function bulletin($id)
-    {   
-        $test = Tcotis::all();
-        $employee = Salarier::where('id',$id)->first();
-        if(!$employee){
-            return redirect()->route('salarier')->with('error','bulletin not found');
-        }
-        $p = Prime::where('salarier_id', $employee->id)->get();
-        $salary = Salaire::where('salarier_id', $employee->id)->first();
-        $tcotisSal = Tcotis::where('type', 'salarier')->first();
-        $bulltinS = Bulletin::where('salarier_id', $employee->id)->first(); 
-        $base_salary = $employee->salaire_base;
-        $prix_jour = $base_salary / 26;
-        $prix_heure = $base_salary / 191;
-        $total_heure =  $salary->nombre_jour * 7.346153846153846; 
-        // dd($total_heure);
-        $total_salaireH = 0 ;
-        $total_salaireJ = 0 ;
-        $total_salaireJ = $prix_jour * $salary->nombre_jour;
-        $total_salaireH = ($prix_heure * $salary->heures_supplementaires * 25 / 100) + $prix_heure * $salary->heures_supplementaires;
-        // dd($total_salaireH);
-        $salaire_base = $total_salaireJ + $total_salaireH;
+{
+    $test = Tcotis::all();
+    $employee = Salarier::find($id);
 
-
-
-
-
-
-
-        // dd($salaire_base);
-
-        $total_brut_salary = $salaire_base;
-        foreach($p as $item){
-            if($item){
-                $total_brut_salary = $salaire_base + $p->where('type', '!=', 'bonus')->sum('prime');
-            }
-            else{
-                $item->prime = 0;
-                $total_brut_salary = $salaire_base + $item->prime;
-            }
-        }
-        $tot = 0;
-        // $toto = 0;
-        if($total_brut_salary > 6000){
-            $cnss = 6000 * $tcotisSal->cnss;
-            $a = $total_brut_salary * ($tcotisSal->Presfamil+$tcotisSal->Taxpro+$tcotisSal->AMOoblSol+$tcotisSal->Pension+$tcotisSal->amo);
-            $tot = $a+$cnss;
-            $total_net_salary = $total_brut_salary - $tot;
-        }
-        else{
-            $tot = ($tcotisSal->Presfamil+$tcotisSal->Taxpro+$tcotisSal->AMOoblSol+$tcotisSal->Pension+$tcotisSal->amo+$tcotisSal->cnss)*$total_brut_salary;
-            $total_net_salary = $total_brut_salary - $tot;
-        }
-        // p
-        $tcotisPat = Tcotis::where('type', 'employeur')->first();
-        if($total_brut_salary > 6000){
-            $cnssp = 6000 * $tcotisPat->cnss;
-            $b = $total_brut_salary * ($tcotisPat->Presfamil+$tcotisPat->Taxpro+$tcotisPat->AMOoblSol+$tcotisPat->Pension+$tcotisPat->amo);
-            $totop = $b+$cnssp;
-        }
-        else{
-            $totop = ($tcotisPat->Presfamil+$tcotisPat->Taxpro+$tcotisPat->AMOoblSol+$tcotisPat->Pension+$tcotisPat->amo+$tcotisPat->cnss)*$total_brut_salary;
-        }
-        // dd($total_net_salary);
-            if($total_net_salary > 6500){
-                $IR =  $total_net_salary * 25 / 100;
-            }
-            else{
-                $IR =  $total_net_salary * 35 / 100;
-            }
-                $i = $total_net_salary - $IR;
-                $bareme = BaremeIR::whereRaw('? BETWEEN tranche_min AND tranche_max', [$i])->first();
-                $IR = ($i * $bareme->taux) / 100;
-                $tx = $IR ? $IR / $i * 100 : 0;
-                $total_net_salary = $total_net_salary - $IR;
-                $total_net_salary = $total_net_salary + $p->where('type', '=', 'bonus')->sum('prime');
-        if(!$bulltinS){
-            $bulltin = new Bulletin();
-            $bulltin->salarier_id = $employee->id;
-            $bulltin->salaire_base = $salaire_base;
-            $bulltin->total_brut_salary = $total_brut_salary;
-            $bulltin->total_net_salary = $total_net_salary ;
-            $bulltin->total_heure = $total_heure + $salary->heures_supplementaires;
-            $bulltin->tcotisSalarier = $tot;
-            $bulltin->import_revenu = $IR;
-            $bulltin->tcotisPatron = $totop;
-            $bulltin->save();
-        }
-        else{
-            return view('search', compact('employee','salary'));
-        }
-        return view('bulletin', compact('p','totop','prix_heure','tx','IR','tot','salary','salaire_base','total_heure','employee','total_net_salary','tcotisPat','tcotisSal','total_brut_salary'));
+    if (!$employee) {
+        return redirect()->route('salarier')->with('error', 'Bulletin not found');
     }
+
+    $p = Prime::where('salarier_id', $employee->id)->get();
+    $salary = Salaire::where('salarier_id', $employee->id)->where('mois', date('Y-m'))->first();
+    $tcotisSal = Tcotis::where('type', 'salarier')->first();
+    $bulltinS = Bulletin::where('salarier_id', $employee->id)
+        ->whereMonth('created_at', date('m'))
+        ->whereYear('created_at', date('Y'))
+        ->first();
+
+    $base_salary = $employee->salaire_base;
+    $prix_jour = $base_salary / 26;
+    $prix_heure = $base_salary / 191;
+    $total_heure = $salary ? $salary->nombre_jour * 7.346153846153846 : 0;
+    $total_salaireJ = $prix_jour * ($salary ? $salary->nombre_jour : 0);
+    $salaire_base = $total_salaireJ;
+    $total_salaireH = 0;
+    $debug_data = [];
+    $total_hours = 0;
+    $total_minutes = 0;
+    if ($salary) {
+        
+        foreach ($salary->date_sup as $h) {
+            preg_match('/(\d+)h\s*(\d+)m/', $h['diff_hours'], $matches);
+            if (count($matches) === 3) {
+                $hours = (int)$matches[1];
+                $minutes = (int)$matches[2];
+                $sup_salary = ($prix_heure * $hours) + ($prix_heure * ($minutes / 60));
+                $total_salaireH += $sup_salary;
+                $total_salaireH += $sup_salary * ($h['pcentage'] / 100);
+                $salaire_base = $total_salaireJ + $total_salaireH;
+                $debug_data[] = [
+                    'total_salaireH' => $total_salaireH,
+                    'total_salaireJ' => $total_salaireJ,
+                    'hours' => $hours,
+                    'minutes' => $minutes,
+                    'prix_heure' => $prix_heure,
+                    'salaire_base' => $salaire_base
+                ];
+                $total_hours += $hours;
+                $total_minutes += $minutes;
+            }
+            
+        }
+    }
+    // dd($salaire_base, $total_hours,'h',$hours,'m' ,$minutes, $total_minutes,$total_salaireH,$total_salaireJ,$prix_heure,$sup_salary);
+
+    $total_brut_salary = $salaire_base;
+    // dd($debug_data);
+
+    foreach ($p as $prime) {
+        if ($prime->type != 'bonus') {
+            $total_brut_salary += $prime->prime;
+        }
+    }
+
+    $total_deductions = 0;
+    if ($total_brut_salary > 6000) {
+        $cnss = 6000 * $tcotisSal->cnss;
+        $deductions = $total_brut_salary * ($tcotisSal->Presfamil + $tcotisSal->Taxpro + $tcotisSal->AMOoblSol + $tcotisSal->Pension + $tcotisSal->amo);
+        $total_deductions = $deductions + $cnss;
+    } else {
+        $total_deductions = ($tcotisSal->Presfamil + $tcotisSal->Taxpro + $tcotisSal->AMOoblSol + $tcotisSal->Pension + $tcotisSal->amo + $tcotisSal->cnss) * $total_brut_salary;
+    }
+
+    $total_net_salary = $total_brut_salary - $total_deductions;
+
+    $tcotisPat = Tcotis::where('type', 'employeur')->first();
+    $total_deductions_pat = 0;
+
+    if ($total_brut_salary > 6000) {
+        $cnssp = 6000 * $tcotisPat->cnss;
+        $deductions_pat = $total_brut_salary * ($tcotisPat->Presfamil + $tcotisPat->Taxpro + $tcotisPat->AMOoblSol + $tcotisPat->Pension + $tcotisPat->amo);
+        $total_deductions_pat = $deductions_pat + $cnssp;
+    } else {
+        $total_deductions_pat = ($tcotisPat->Presfamil + $tcotisPat->Taxpro + $tcotisPat->AMOoblSol + $tcotisPat->Pension + $tcotisPat->amo + $tcotisPat->cnss) * $total_brut_salary;
+    }
+
+    $IR = $total_net_salary > 6500 ? $total_net_salary * 0.25 : $total_net_salary * 0.35;
+    $i = $total_net_salary - $IR;
+    $bareme = BaremeIR::whereRaw('? BETWEEN tranche_min AND tranche_max', [$i])->first();
+    $IR = ($i * $bareme->taux) / 100;
+    $tx = $IR ? $IR / $i * 100 : 0;
+    $total_net_salary -= $IR;
+    $total_net_salary += $p->where('type', 'bonus')->sum('prime');
+
+    if (!$bulltinS) {
+        $bulltin = new Bulletin();
+        $bulltin->salarier_id = $employee->id;
+        $bulltin->salaire_base = $salaire_base;
+        $bulltin->total_brut_salary = $total_brut_salary;
+        $bulltin->total_net_salary = $total_net_salary;
+        $bulltin->total_heure = $total_heure;
+        $bulltin->heure_sup = $total_hours + $total_minutes * 0.01;
+        $bulltin->tcotisSalarier = $total_deductions;
+        $bulltin->import_revenu = $IR;
+        $bulltin->tcotisPatron = $total_deductions_pat;
+        // dd($bulltin);
+        $bulltin->save();
+    } else {
+        return view('search', compact('employee', 'salary'));
+    }
+
+    return view('bulletin', compact('p', 'total_deductions', 'prix_heure', 'tx', 'minutes', 'hours', 'IR', 'total_deductions_pat', 'salary', 'salaire_base', 'total_heure', 'employee', 'total_net_salary', 'tcotisPat', 'tcotisSal', 'total_brut_salary'));
+}
+
     public function prime(){
         $salaries = Salarier::with('prime')->get();
         return view('prime.index', compact('salaries'));
@@ -213,7 +237,6 @@ class CalculerController extends Controller
                                      ->whereMonth('created_at', date('m'))
                                      ->whereYear('created_at', date('Y'))
                                      ->first();
-        
             if ($salaireExists) {
                 return redirect()->route('bulletinP', ['id' => $id]);
             } else {
@@ -231,14 +254,44 @@ class CalculerController extends Controller
             $request->validate([
                 'mois' => 'required|date_format:Y-m', 
                 'nombre_jour' => 'required|numeric|max:26',
-                'heures_supplementaires' => 'required|numeric',
-                'salarier_id' => 'required', 
+                'salarier_id' => 'required',
             ]);
+            $salaireExist = Salaire::where('salarier_id', $request->salarier_id)
+                           ->where('mois', $request->mois)
+                           ->first();
+
+                if ($salaireExist) {
+                    return redirect()->back()->withErrors(['error' => 'Le salaire pour ce mois existe déjà pour ce salarié.']);
+                }
+            $dates = [];
+            if (is_array($request->date_debut) && is_array($request->date_fin) && is_array($request->multiplier)) {
+                $count = min(count($request->date_debut), count($request->date_fin), count($request->multiplier));
+                for ($i = 0; $i < $count; $i++) {
+                    try {
+                        $dateDebut = Carbon::parse($request->date_debut[$i]);
+                        $dateFin = Carbon::parse($request->date_fin[$i]);
+                        $diffInMinutes = $dateDebut->diffInMinutes($dateFin);
+                        $hours = intdiv($diffInMinutes, 60);
+                        $minutes = $diffInMinutes % 60;
+                        $dates[] = [
+                            'date_debut' => $request->date_debut[$i],
+                            'date_fin' => $request->date_fin[$i],
+                            'diff_hours' => "{$hours}h {$minutes}m",
+                            'pcentage' => $request->multiplier[$i]
+                        ];
+                    } catch (Exception $e) {
+                        Log::error("Error processing dates: " . $e->getMessage());
+                    }
+                }
+            } else {
+                $dates = [];
+            }
+
                 $salaire = new Salaire();
                 $salaire->salarier_id = $request->salarier_id;
                 $salaire->mois = $request->mois;
                 $salaire->nombre_jour = $request->nombre_jour;
-                $salaire->heures_supplementaires = $request->heures_supplementaires;
+                $salaire->date_sup = $dates;
                 $salaire->save();
                 return redirect()->route('bulletinP', ['id' => $request->salarier_id]);
         
@@ -246,10 +299,14 @@ class CalculerController extends Controller
             }
             public function searchBulletin(Request $request)
             {
-                $bulletin = Bulletin::with('salarier')->where('salarier_id', $request->salarier_id)->first();
-                $salary = Salaire::where('mois', $request->mois)
-                ->where('salarier_id', $bulletin->salarier_id)
+                $bulletin = Bulletin::with('salarier')->where('salarier_id', $request->salarier_id)
+                ->whereMonth('created_at', date('m'))
+                ->whereYear('created_at', date('Y'))->first();
+                $salary = Salaire::where('mois', $request->mois)->where('salarier_id', $bulletin->salarier_id)
                 ->first();
+                if(!$salary){
+                    return back()->with('error', 'bulletin not found !!');
+                }
                 $p = Prime::where('salarier_id', $bulletin->salarier_id)
                 ->where('mois', $request->mois)->get();
                 $tcotisSal = Tcotis::where('type', 'salarier')->first();
@@ -268,20 +325,7 @@ class CalculerController extends Controller
                 $bareme = BaremeIR::whereRaw('? BETWEEN tranche_min AND tranche_max', [$i])->first();
                 $IR = ($i * $bareme->taux) / 100;
                 $tx = $IR ? $IR / $i * 100 : 0;
-                // $total_net_salary = $total_net_salary - $IR;
-                // dd($tx);
-                $baseRate = 100; // Le tarif de base par heure
-                $date = $request->input('date');
-                $startTime = $request->input('start_time');
-                $endTime = $request->input('end_time');
-
-                $hourlyRate = $this->calculateHourlyRate($baseRate, $date, $startTime, $endTime);
-                $totalHours = $this->calculateTotalHours($date, $startTime, $endTime);
-                $totalPay = $this->calculateTotalPay($hourlyRate, $totalHours);
-                $totalPay = $totalPay - $bulletin->tcotisSalarier;
-                dd($totalPay);
-
+                $total_net_salary = $total_net_salary - $IR;
                 return view('bulletinSalarier', compact('bulletin','salary','IR','tx','prix_heure','p','total_heure','tcotisSal','tcotisPat'));
             }
-            
 }

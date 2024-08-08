@@ -11,4 +11,7 @@ class Salaire extends Model
     public function salarier(){
         return $this->belongsTo(Salarier::class);
     }
+    protected $casts = [
+        'date_sup' => 'array',
+    ];
 }

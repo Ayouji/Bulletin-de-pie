@@ -17,6 +17,7 @@ return new class extends Migration
             $table->float('tcotisPatron');
             $table->float('tcotisSalarier');
             $table->float('total_heure');
+            $table->float('heure_sup');
             $table->float('import_revenu');
             $table->float('total_net_salary');
             $table->float('total_brut_salary');

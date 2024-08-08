@@ -83,7 +83,7 @@
                     <span class="label">{{$bulletin->salarier->qualification}}</span>
                 </td>
                 <td>
-                    <span class="label">{{number_format($bulletin->total_heure, 2)}}</span>
+                    <span class="label">{{number_format($bulletin->total_heure + $bulletin->heure_sup, 2)}}</span>
                 </td>
                 <td>
                     <span class="label">{{$salary->mois}}</span>
@@ -111,7 +111,7 @@
                 <td>Salaire de base mensuel 26 j</td>
                 {{-- <td></td> --}}
                 <td>{{number_format($total_heure, 2)}} + 
-                    {{$salary->heures_supplementaires ? $salary->heures_supplementaires : 0.00}}</td>
+                    {{$bulletin->heure_sup}}</td>
                 <td>{{number_format($prix_heure,2)}}</td>
                 <td>{{number_format($bulletin->salaire_base,2)}}</td>
                 <td></td>

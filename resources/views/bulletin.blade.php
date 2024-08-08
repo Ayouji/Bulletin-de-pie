@@ -87,7 +87,7 @@
                     <span class="label">{{$employee->qualification}}</span>
                 </td>
                 <td>
-                    <span class="label">{{number_format($total_heure + $salary->heures_supplementaires, 2)}}</span>
+                    <span class="label">{{number_format($total_heure + $hours + $minutes * 0.01, 2)}}</span>
                 </td>
                 <td>
                     <span class="label">{{$salary->mois}}</span>
@@ -115,7 +115,7 @@
                 <td>Salaire de base mensuel 26 j</td>
                 {{-- <td></td> --}}
                 <td>{{number_format($total_heure, 2)}} + 
-                    {{$salary->heures_supplementaires ? $salary->heures_supplementaires : 0.00}}</td>
+                    {{$hours +$minutes * 0.01}}</td>
                 <td>{{number_format($prix_heure,2)}}</td>
                 <td>{{number_format($salaire_base,2)}}</td>
                 <td></td>
@@ -192,8 +192,8 @@
             </tr>
             <tr class="highlight-purple custom-header custom-border-top custom-border-bottom">
                 <td>Total des cotisations et contributions</td>
-                <td colspan="4">{{number_format($tot,2)}}</td>
-                <td>{{number_format($totop,2)}}</td>
+                <td colspan="4">{{number_format($total_deductions,2)}}</td>
+                <td>{{number_format($total_deductions_pat,2)}}</td>
             </tr>
             <tr class="highlight-purple custom-header custom-border-top custom-border-bottom">
                 <td rowspan="2">IMPOT SUR REVENU</td>
@@ -204,7 +204,7 @@
                 <td></td>
             </tr>
             <tr>
-                <td>{{number_format($total_brut_salary - $tot,2)}}</td>
+                <td>{{number_format($total_brut_salary - $total_deductions,2)}}</td>
                 <td>{{number_format($tx,2)}}%</td>
                 <td></td>
                 <td>{{number_format($IR,2)}}</td>
@@ -213,7 +213,7 @@
             @if ($p->where('type', '=', 'bonus')->isNotEmpty())
             <tr class="">
                 <td>MONTANT NET</td>
-                <td colspan="5">{{number_format($total_brut_salary - $tot,2)}} DH</td>
+                <td colspan="5">{{number_format($total_brut_salary - $total_deductions - $IR,2)}} DH</td>
             </tr>
                 <tr class="highlight-purple custom-header custom-border-top custom-border-bottom">
                     <td>Total Primes</td>

@@ -20,3 +20,4 @@ Route::get('/salarier/{id}',[CalculerController::class,'destroySalarier'])->name
 Route::get('/salaire/create/{id}',[CalculerController::class,'salaire'])->name('salaire.create');
 Route::post('/salaire/store',[CalculerController::class,'storesalaire'])->name('salaire.store');
 Route::post('/bulletin/search',[CalculerController::class,'searchBulletin'])->name('bulletin.search');
+
